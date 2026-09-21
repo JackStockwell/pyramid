@@ -40,7 +40,6 @@ export function Pyramid({ slots, currentIndex }: PyramidProps) {
                     card={slot.card}
                     faceDown={!slot.revealed}
                     size="md"
-                    highlighted={isActive}
                     dimmed={!slot.revealed && !isNext}
                   />
                   <span

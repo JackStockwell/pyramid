@@ -184,7 +184,7 @@ export function GameBoard({ roomId, sessionId, state }: GameBoardProps) {
 
       {activeSlot?.revealed && activeSlot.card && (
         <div className="flex flex-col items-center gap-1 py-2">
-          <PlayingCard card={activeSlot.card} size="xl" highlighted />
+          <PlayingCard card={activeSlot.card} size="xl" />
           <span className="text-sm font-medium text-amber-500">
             {activeSlot.value} sip{activeSlot.value === 1 ? "" : "s"}
           </span>
