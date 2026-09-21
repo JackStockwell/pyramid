@@ -9,9 +9,10 @@ export interface HandCardView {
 interface HandProps {
   cards: HandCardView[];
   revealed: boolean;
+  onRevealCard?: (handCardId: string) => void;
 }
 
-export function Hand({ cards, revealed }: HandProps) {
+export function Hand({ cards, revealed, onRevealCard }: HandProps) {
   if (cards.length === 0) {
     return <p className="text-muted-foreground text-sm">Your hand is empty.</p>;
   }
@@ -19,7 +20,13 @@ export function Hand({ cards, revealed }: HandProps) {
   return (
     <div className="flex flex-wrap justify-center gap-2">
       {cards.map((hc) => (
-        <PlayingCard key={hc.id} card={hc.card} faceDown={!revealed} size="md" />
+        <PlayingCard
+          key={hc.id}
+          card={hc.card}
+          faceDown={!revealed}
+          size="md"
+          onClick={revealed && onRevealCard ? () => onRevealCard(hc.id) : undefined}
+        />
       ))}
     </div>
   );

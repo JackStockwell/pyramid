@@ -194,7 +194,8 @@ export const startGame = mutation({
         {
           id: crypto.randomUUID(),
           ts: Date.now(),
-          message: `Cards dealt. Peek at your hand — it hides in ${room.peekSeconds}s.`,
+          kind: "info" as const,
+          text: `Cards dealt. Peek at your hand — it hides in ${room.peekSeconds}s.`,
         },
       ],
     });
@@ -210,7 +211,10 @@ export const advanceFromPeek = mutation({
     if (!room.peekEndsAt || Date.now() < room.peekEndsAt) return;
     await ctx.db.patch(roomId, {
       status: "playing",
-      log: [...room.log, { id: crypto.randomUUID(), ts: Date.now(), message: "The pyramid is live. First card, flip it!" }],
+      log: [
+        ...room.log,
+        { id: crypto.randomUUID(), ts: Date.now(), kind: "info" as const, text: "The pyramid is live. First card, flip it!" },
+      ],
     });
   },
 });

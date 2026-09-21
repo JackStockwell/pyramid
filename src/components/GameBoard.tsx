@@ -2,13 +2,14 @@ import { useMutation } from "convex/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
-import { ActivityLog } from "@/components/ActivityLog";
+import { ActivityLog, type LogEntry } from "@/components/ActivityLog";
 import { Hand } from "@/components/Hand";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Pyramid } from "@/components/Pyramid";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import { sortByRank, type Card } from "@/lib/cards";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -39,7 +40,7 @@ export interface GameState {
   total: number;
   peekEndsAt: number | null;
   peekSeconds: number;
-  log: { id: string; ts: number; message: string }[];
+  log: LogEntry[];
   pyramid: PyramidSlotState[];
   players: PlayerView[];
   me: { sessionId: string; name: string; isHost: boolean; hand: { id: string; card: Card }[] } | null;
@@ -55,10 +56,12 @@ export function GameBoard({ roomId, sessionId, state }: GameBoardProps) {
   const advanceFromPeek = useMutation(api.rooms.advanceFromPeek);
   const flip = useMutation(api.game.flipNext);
   const logHandPeek = useMutation(api.game.logHandPeek);
+  const revealHandCard = useMutation(api.game.revealHandCard);
   const playAgain = useMutation(api.rooms.playAgain);
 
   const [flipping, setFlipping] = useState(false);
   const [handRevealed, setHandRevealed] = useState(false);
+  const [showPyramid, setShowPyramid] = useState(true);
 
   // Hand starts hidden the moment the pyramid goes live, so players have to
   // rely on memory from the peek phase rather than leaving cards on display.
@@ -107,6 +110,14 @@ export function GameBoard({ roomId, sessionId, state }: GameBoardProps) {
     }
   }
 
+  async function handleRevealCard(handCardId: string) {
+    try {
+      await revealHandCard({ roomId, sessionId, handCardId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't show that card.");
+    }
+  }
+
   if (state.status === "peeking") {
     const remaining = state.peekEndsAt ? Math.max(0, Math.ceil((state.peekEndsAt - now) / 1000)) : 0;
     return (
@@ -147,12 +158,29 @@ export function GameBoard({ roomId, sessionId, state }: GameBoardProps) {
             </Badge>
           ))}
         </div>
-        <Badge variant="secondary">
-          {state.currentIndex}/{state.total}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">
+            {state.currentIndex}/{state.total}
+          </Badge>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="hidden md:inline-flex"
+            onClick={() => setShowPyramid((v) => !v)}
+          >
+            {showPyramid ? "Hide pyramid" : "Show pyramid"}
+          </Button>
+        </div>
       </div>
 
-      <Pyramid slots={state.pyramid} currentIndex={state.currentIndex} />
+      {showPyramid && (
+        <div className="hidden md:block">
+          <Pyramid slots={state.pyramid} currentIndex={state.currentIndex} />
+        </div>
+      )}
+      <div className={cn(showPyramid && "md:hidden")}>
+        <PyramidProgress current={state.currentIndex} total={state.total} />
+      </div>
 
       {activeSlot?.revealed && activeSlot.card && (
         <div className="flex flex-col items-center gap-1 py-2">
@@ -177,12 +205,28 @@ export function GameBoard({ roomId, sessionId, state }: GameBoardProps) {
           </Button>
         </div>
         <p className="mb-2 text-center text-xs text-muted-foreground">
-          Peeking mid-round gets announced to the table.
+          {handRevealed
+            ? "Tap a card to show it to the table."
+            : "Peeking mid-round gets announced to the table."}
         </p>
-        <Hand cards={myHand} revealed={handRevealed} />
+        <Hand cards={myHand} revealed={handRevealed} onRevealCard={handleRevealCard} />
       </div>
 
       <ActivityLog entries={state.log} />
+    </div>
+  );
+}
+
+function PyramidProgress({ current, total }: { current: number; total: number }) {
+  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  return (
+    <div className="flex flex-col items-center gap-1.5 py-2">
+      <p className="text-muted-foreground text-sm">
+        {current} of {total} cards revealed
+      </p>
+      <div className="bg-muted h-1.5 w-40 overflow-hidden rounded-full">
+        <div className="bg-primary h-full transition-all" style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }

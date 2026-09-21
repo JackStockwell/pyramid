@@ -38,10 +38,22 @@ export const pyramidSlotValidator = v.object({
   revealed: v.boolean(),
 });
 
+// Structured log entries (rather than a single formatted string) so the
+// client can render suits with the right color and give peek/reveal
+// entries distinct highlighting.
 export const logEntryValidator = v.object({
   id: v.string(),
   ts: v.number(),
-  message: v.string(),
+  kind: v.union(
+    v.literal("info"),
+    v.literal("flip"),
+    v.literal("peek"),
+    v.literal("reveal"),
+  ),
+  text: v.optional(v.string()),
+  actorName: v.optional(v.string()),
+  card: v.optional(cardValidator),
+  value: v.optional(v.number()),
 });
 
 export const handCardValidator = v.object({

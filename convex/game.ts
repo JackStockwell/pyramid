@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { cardValue } from "./lib/deck";
-import type { Card } from "./types";
 
 export const getGameState = query({
   args: { roomId: v.id("rooms"), sessionId: v.string() },
@@ -89,10 +88,20 @@ export const flipNext = mutation({
         {
           id: crypto.randomUUID(),
           ts: Date.now(),
-          message: `${player.name} flipped the ${cardLabel(slot.card)} (worth ${cardValue(slot.card.rank)}).`,
+          kind: "flip" as const,
+          actorName: player.name,
+          card: slot.card,
+          value: cardValue(slot.card.rank),
         },
         ...(finished
-          ? [{ id: crypto.randomUUID(), ts: Date.now(), message: "Pyramid cleared. Game over!" }]
+          ? [
+              {
+                id: crypto.randomUUID(),
+                ts: Date.now(),
+                kind: "info" as const,
+                text: "Pyramid cleared. Game over!",
+              },
+            ]
           : []),
       ],
     });
@@ -119,13 +128,42 @@ export const logHandPeek = mutation({
     await ctx.db.patch(roomId, {
       log: [
         ...room.log,
-        { id: crypto.randomUUID(), ts: Date.now(), message: `${player.name} peeked at their hand.` },
+        { id: crypto.randomUUID(), ts: Date.now(), kind: "peek" as const, actorName: player.name },
       ],
     });
   },
 });
 
-function cardLabel(card: Card): string {
-  const suitSymbol = { S: "♠", H: "♥", D: "♦", C: "♣" }[card.suit];
-  return `${card.rank}${suitSymbol}`;
-}
+// Lets a player show one specific card from their hand to the whole table
+// (e.g. to settle a call-out) without leaving their hand open the whole
+// time — the hand itself stays private, only the chosen card is posted.
+export const revealHandCard = mutation({
+  args: { roomId: v.id("rooms"), sessionId: v.string(), handCardId: v.string() },
+  handler: async (ctx, { roomId, sessionId, handCardId }) => {
+    const room = await ctx.db.get(roomId);
+    if (!room) throw new Error("Room not found.");
+    const player = await ctx.db
+      .query("players")
+      .withIndex("by_room_and_session", (q) =>
+        q.eq("roomId", roomId).eq("sessionId", sessionId),
+      )
+      .unique();
+    if (!player) throw new Error("You're not in this room.");
+
+    const handEntry = player.hand.find((h) => h.id === handCardId);
+    if (!handEntry) throw new Error("That card isn't in your hand.");
+
+    await ctx.db.patch(roomId, {
+      log: [
+        ...room.log,
+        {
+          id: crypto.randomUUID(),
+          ts: Date.now(),
+          kind: "reveal" as const,
+          actorName: player.name,
+          card: handEntry.card,
+        },
+      ],
+    });
+  },
+});
