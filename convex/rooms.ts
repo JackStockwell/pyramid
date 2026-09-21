@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import {
   buildDeck,
   dealFixedHands,
@@ -10,6 +10,7 @@ import {
 } from "./lib/deck";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const INACTIVITY_MS = 10 * 60 * 1000;
 
 function randomCode(): string {
   let code = "";
@@ -45,6 +46,7 @@ export const createRoom = mutation({
       peekSeconds: 12,
       log: [],
       createdAt: Date.now(),
+      lastActivityAt: Date.now(),
     });
 
     await ctx.db.insert("players", {
@@ -98,6 +100,7 @@ export const joinRoom = mutation({
       hand: [],
       joinedAt: Date.now(),
     });
+    await ctx.db.patch(room._id, { lastActivityAt: Date.now() });
 
     return { roomId: room._id };
   },
@@ -133,7 +136,7 @@ export const setHandSize = mutation({
     if (room.hostSessionId !== sessionId) throw new Error("Only the host can do that.");
     if (room.status !== "lobby") throw new Error("Game already started.");
     if (handSize < 2 || handSize > 15) throw new Error("Hand size must be between 2 and 15.");
-    await ctx.db.patch(roomId, { handSize });
+    await ctx.db.patch(roomId, { handSize, lastActivityAt: Date.now() });
   },
 });
 
@@ -190,6 +193,7 @@ export const startGame = mutation({
       pyramid,
       currentIndex: 0,
       peekEndsAt,
+      lastActivityAt: Date.now(),
       log: [
         {
           id: crypto.randomUUID(),
@@ -211,6 +215,7 @@ export const advanceFromPeek = mutation({
     if (!room.peekEndsAt || Date.now() < room.peekEndsAt) return;
     await ctx.db.patch(roomId, {
       status: "playing",
+      lastActivityAt: Date.now(),
       log: [
         ...room.log,
         { id: crypto.randomUUID(), ts: Date.now(), kind: "info" as const, text: "The pyramid is live. First card, flip it!" },
@@ -231,6 +236,7 @@ export const playAgain = mutation({
       pyramid: [],
       currentIndex: 0,
       peekEndsAt: undefined,
+      lastActivityAt: Date.now(),
       log: [],
     });
     const players = await ctx.db
@@ -254,5 +260,31 @@ export const leaveRoom = mutation({
       .unique();
     if (!player) return;
     await ctx.db.delete(player._id);
+  },
+});
+
+// Runs on a schedule (see crons.ts) — closes any room nobody's touched in
+// a while so stale games don't just pile up.
+export const closeInactiveRooms = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - INACTIVITY_MS;
+    const staleRooms = await ctx.db
+      .query("rooms")
+      .withIndex("by_last_activity", (q) => q.lt("lastActivityAt", cutoff))
+      .collect();
+
+    for (const room of staleRooms) {
+      const players = await ctx.db
+        .query("players")
+        .withIndex("by_room", (q) => q.eq("roomId", room._id))
+        .collect();
+      for (const player of players) {
+        await ctx.db.delete(player._id);
+      }
+      await ctx.db.delete(room._id);
+    }
+
+    return { closedRooms: staleRooms.length };
   },
 });

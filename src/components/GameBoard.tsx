@@ -209,7 +209,12 @@ export function GameBoard({ roomId, sessionId, state }: GameBoardProps) {
             ? "Tap a card to show it to the table."
             : "Peeking mid-round gets announced to the table."}
         </p>
-        <Hand cards={myHand} revealed={handRevealed} onRevealCard={handleRevealCard} />
+        <Hand
+          cards={myHand}
+          revealed={handRevealed}
+          matchRank={activeSlot?.card?.rank ?? null}
+          onRevealCard={handleRevealCard}
+        />
       </div>
 
       <ActivityLog entries={state.log} />

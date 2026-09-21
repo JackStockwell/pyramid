@@ -83,6 +83,7 @@ export const flipNext = mutation({
       pyramid,
       currentIndex: nextIndex,
       status: finished ? "finished" : "playing",
+      lastActivityAt: Date.now(),
       log: [
         ...room.log,
         {
@@ -126,6 +127,7 @@ export const logHandPeek = mutation({
       .unique();
     if (!player) return;
     await ctx.db.patch(roomId, {
+      lastActivityAt: Date.now(),
       log: [
         ...room.log,
         { id: crypto.randomUUID(), ts: Date.now(), kind: "peek" as const, actorName: player.name },
@@ -154,6 +156,7 @@ export const revealHandCard = mutation({
     if (!handEntry) throw new Error("That card isn't in your hand.");
 
     await ctx.db.patch(roomId, {
+      lastActivityAt: Date.now(),
       log: [
         ...room.log,
         {

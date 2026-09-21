@@ -24,7 +24,10 @@ export default defineSchema({
     peekSeconds: v.number(),
     log: v.array(logEntryValidator),
     createdAt: v.number(),
-  }).index("by_code", ["code"]),
+    lastActivityAt: v.number(),
+  })
+    .index("by_code", ["code"])
+    .index("by_last_activity", ["lastActivityAt"]),
 
   players: defineTable({
     roomId: v.id("rooms"),
