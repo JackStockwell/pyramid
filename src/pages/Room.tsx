@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "convex/react";
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import { GameBoard } from "@/components/GameBoard";
@@ -19,14 +19,7 @@ export default function Room() {
     return <CenteredMessage>Loading…</CenteredMessage>;
   }
   if (roomPreview === null) {
-    return (
-      <CenteredMessage>
-        <p className="mb-4">No room found for code {code.toUpperCase()}.</p>
-        <Link to="/" className={buttonVariants()}>
-          Back home
-        </Link>
-      </CenteredMessage>
-    );
+    return <RoomGone message={`No room found for code ${code.toUpperCase()}.`} />;
   }
 
   return <RoomInner roomId={roomPreview.roomId} code={roomPreview.code} sessionId={sessionId} />;
@@ -50,11 +43,7 @@ function RoomInner({
     return <CenteredMessage>Loading…</CenteredMessage>;
   }
   if (state === null) {
-    return (
-      <CenteredMessage>
-        <p>This room no longer exists.</p>
-      </CenteredMessage>
-    );
+    return <RoomGone message="This room closed after sitting inactive for a while." />;
   }
 
   if (!state.me) {
@@ -107,6 +96,25 @@ function RoomInner({
   }
 
   return <GameBoard roomId={roomId} sessionId={sessionId} state={state} />;
+}
+
+function RoomGone({ message }: { message: string }) {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const timer = setTimeout(() => navigate("/"), 4000);
+    return () => clearTimeout(timer);
+  }, [navigate]);
+
+  return (
+    <CenteredMessage>
+      <p>{message}</p>
+      <Link to="/" className={buttonVariants()}>
+        Back home
+      </Link>
+      <p className="text-muted-foreground text-xs">Taking you home in a few seconds…</p>
+    </CenteredMessage>
+  );
 }
 
 function CenteredMessage({ children }: { children: React.ReactNode }) {

@@ -2,6 +2,7 @@ import { ThemeProvider } from "next-themes";
 import { Route, Routes } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { HomeButton } from "@/components/HomeButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import Home from "@/pages/Home";
 import Room from "@/pages/Room";
@@ -11,6 +12,7 @@ export default function App() {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <TooltipProvider>
         <div className="min-h-svh bg-background text-foreground">
+          <HomeButton />
           <ThemeToggle />
           <Routes>
             <Route path="/" element={<Home />} />
